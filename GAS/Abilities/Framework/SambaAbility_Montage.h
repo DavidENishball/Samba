@@ -31,6 +31,14 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	UAbilitySystemComponent* TargetComponent;
 
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void ActivateAbility_PreMontage(FGameplayEventData Data);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void ActivateAbility_PostMontage(FGameplayEventData Data);
+
+
 	void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 		/** Returns true if this ability can be activated right now. Has no side effects */

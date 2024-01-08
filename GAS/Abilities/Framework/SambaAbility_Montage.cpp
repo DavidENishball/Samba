@@ -14,6 +14,8 @@ void USambaAbility_Montage::ActivateAbility(const FGameplayAbilitySpecHandle Han
 		// Store trigger target.
 	}
 
+	ActivateAbility_PreMontage(TriggerEventData ? *TriggerEventData : FGameplayEventData());
+
 	UAnimMontage* ChosenMontage = MontageData.SpecificMontage; // nullpMontageData.ChooseMontage(ActorInfo->AvatarActor);
 
 	UAbilityTask_PlayMontageAndWait* NewMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, FName("MontageTask"), ChosenMontage, MontageData.PlayRate, MontageData.StartSection); // Todo: make a static for this.
@@ -26,6 +28,9 @@ void USambaAbility_Montage::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	// Assume that a different system will respond to notifies.
 
 	NewMontageTask->ReadyForActivation();
+
+	ActivateAbility_PostMontage(TriggerEventData ? *TriggerEventData : FGameplayEventData());
+
 }
 
 

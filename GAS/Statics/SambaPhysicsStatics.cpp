@@ -39,7 +39,7 @@ void USambaPhysicsStatics::FlattenActorTransform(AActor* Actor)
 
 
 
-FVector USambaPhysicsStatics::GetStandingLocation(AActor* InActor, FVector FloorLocation)
+FVector USambaPhysicsStatics::GetStandingLocation(const AActor* InActor, FVector FloorLocation)
 {
 	if (InActor == nullptr)
 	{
@@ -58,7 +58,7 @@ FVector USambaPhysicsStatics::GetStandingLocation(AActor* InActor, FVector Floor
 	return FinalLocation;
 }
 
-FVector USambaPhysicsStatics::GetActorBaseLocation(AActor* InActor)
+FVector USambaPhysicsStatics::GetActorBaseLocation(const AActor* InActor)
 {
 	if (InActor == nullptr)
 	{

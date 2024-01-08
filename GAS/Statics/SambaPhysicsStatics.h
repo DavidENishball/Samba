@@ -14,13 +14,13 @@ class SAMBA_API USambaPhysicsStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 public:
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	static FRotator GetFlatRotation(FRotator Rotation);
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	static void FlattenRotationInPlace(FRotator& Rotation);
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	static FTransform GetFlatTransform(FTransform Transform);
 
 	UFUNCTION(BlueprintCallable)
@@ -29,9 +29,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	static void FlattenActorTransform(AActor* Actor);
 
-	UFUNCTION(BlueprintCallable)
-	static FVector GetStandingLocation(AActor* InActor, FVector FloorLocation);
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	static FVector GetStandingLocation(const AActor* InActor, FVector FloorLocation);
 
-	UFUNCTION(BlueprintCallable)
-	static FVector GetActorBaseLocation(AActor* InActor);
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	static FVector GetActorBaseLocation(const AActor* InActor);
 };

@@ -7,6 +7,7 @@
 #include "AbilitySystemComponent.h"
 #include "../../../../../../../Source/Runtime/Engine/Classes/Components/InputComponent.h"
 #include "../../../../../../../Plugins/EnhancedInput/Source/EnhancedInput/Public/EnhancedInputComponent.h"
+#include "GAS/Statics/SambaGameplayStatics.h"
 
 // Sets default values for this component's properties
 UComboPathComponent::UComboPathComponent()
@@ -31,11 +32,51 @@ void UComboPathComponent::BeginPlay()
 		return;
 	}
 
-	// Starting with the root node, aquire all abilities referenced and index.
-
-	TSet < TSubclassOf<UAbilityComboSystemNode>> UniqueSet;
+	
+	TSet<TSubclassOf<UGameplayAbility>> AbilitiesAlreadyOwned;
 
 	TSet<UInputAction*> ActionsToBind;
+
+	///// Instantiate universal nodes.
+	for (TSubclassOf<UAbilityComboSystemNode> IteratedNodeClass : UniversalNodes)
+	{
+		UAbilityComboSystemNode* NodeInstance = NewObject<UAbilityComboSystemNode>(this, IteratedNodeClass);
+		InstantiatedNodes.Add(NodeInstance);
+		InstantiatedUniversalNodes.Add(NodeInstance); // Signify they're universal.
+
+		// Get input bindings.
+		ActionsToBind.Append(IInputBindingsInterface::Execute_GetInputActions(NodeInstance));
+
+		// Add linked abilities;
+
+		for (const FAbilityComboSystemLink& IteratedLink : NodeInstance->Links)
+		{
+			TSubclassOf<UGameplayAbility> LinkedAbilityClass = IteratedLink.LinkedAbility;
+			if (!ensureAlways(LinkedAbilityClass != nullptr))
+			{
+				continue;
+			}
+
+			if (AbilitiesAlreadyOwned.Contains(LinkedAbilityClass) == false)
+			{
+				FGameplayAbilitySpecHandle Handle = USambaGameplayStatics::GetAbilitySpecHandleByClass(ASC, LinkedAbilityClass);
+
+				if (Handle.IsValid() == false)
+				{
+					// Grant the ability if we don't have it.
+					FGameplayAbilitySpecHandle UnusedHandle = ASC->K2_GiveAbility(LinkedAbilityClass); // TODO : cache this?  Maybe for abilities that are explicitly granted by this component.
+					GrantedAbilities.Add(UnusedHandle);
+				}
+				
+				AbilitiesAlreadyOwned.Add(LinkedAbilityClass);
+			}
+		}
+	}
+
+	///// Instantiate Combo nodes.
+	// Starting with the root node, acquire all abilities referenced and index.
+
+	TSet < TSubclassOf<UAbilityComboSystemNode>> UniqueSet;
 
 	for (TSubclassOf<UAbilityComboSystemNode> IteratedNodeClass : ComboNodes)
 	{
@@ -68,7 +109,7 @@ void UComboPathComponent::BeginPlay()
 			{
 				// We already have a spec for this ability.
 				AbilityToNodeMap.Add(ExistingSpec->Handle, NewNode);
-			}			
+			}
 		}
 		else
 		{
@@ -107,6 +148,7 @@ void UComboPathComponent::BeginPlay()
 
 
 // Called every frame
+// TODO: Yes I know tick is bad.  At some point I could check based on input event, and index the nodes based on input type.
 void UComboPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -117,19 +159,46 @@ void UComboPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	// Get appropriate node.
 	// Do we have a valid link?  If so, try activate.
 
+
 	// TODO: Check if we've changed abilities in a way that doesn't follow a link.  That means we've broken the combo.
 	// Can use this to do things like add links that persist down-stream.  Nested combos.
 
-	FGameplayAbilitySpecHandle CurrentAbilityHandle; 
 
+	FGameplayAbilitySpecHandle CurrentAbilityHandle; // Determine what ability we are currently using. 
 	CurrentAnimatingAbility = ASC->GetAnimatingAbility();
 	if (CurrentAnimatingAbility != nullptr)
 	{
 		CurrentAbilityHandle = CurrentAnimatingAbility->GetCurrentAbilitySpecHandle();
 	}
 
-	if (AbilityToNodeMap.Contains(CurrentAbilityHandle))
+	// Evaluate general nodes.
+	FGameplayAbilitySpec* SpecForValidLink = nullptr;
+
+	for (UAbilityComboSystemNode* IteratedUniversalNode : InstantiatedUniversalNodes)
 	{
+		FGameplayTagContainer TempContainer;
+		FAbilityComboSystemLink BestLink = IteratedUniversalNode->GetBestLink(CurrentAbilityHandle, ASC->AbilityActorInfo.Get(), &TempContainer, &TempContainer, &TempContainer);
+
+		FGameplayAbilitySpec* SpecToTest = ASC->FindAbilitySpecFromClass(BestLink.LinkedAbility); // If we don't own the ability, assume we don't use the link.  Works for now.
+		if (SpecToTest == nullptr)
+		{
+			continue;
+		}
+
+		// Check the ability is usable.
+		if (SpecToTest->Ability->CanActivateAbility(SpecToTest->Handle, ASC->AbilityActorInfo.Get()))
+		{
+			// We've got a valid link!
+			SpecForValidLink = SpecToTest;
+			break;
+		}
+	}
+
+
+	if (SpecForValidLink == nullptr && AbilityToNodeMap.Contains(CurrentAbilityHandle))
+	{
+		// Evaluate combo nodes.
+
 		UAbilityComboSystemNode* BestNode = AbilityToNodeMap[CurrentAbilityHandle];
 		if (BestNode == nullptr)
 		{
@@ -142,11 +211,22 @@ void UComboPathComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 			FGameplayTagContainer TempContainer;
 			FAbilityComboSystemLink BestLink = BestNode->GetBestLink(CurrentAbilityHandle, ASC->AbilityActorInfo.Get(), &TempContainer, &TempContainer, &TempContainer); //  !!!!!!MAJOR TODO: How do I get all the actor info I need?
 
-			if (FGameplayAbilitySpec* FoundSpec = ASC->FindAbilitySpecFromClass(BestLink.LinkedAbility))
+			FGameplayAbilitySpec* SpecToTest = ASC->FindAbilitySpecFromClass(BestLink.LinkedAbility); // If we don't own the ability, assume we don't use the link.  Works for now.
+
+			if (SpecToTest != nullptr && SpecToTest->Ability->CanActivateAbility(SpecToTest->Handle, ASC->AbilityActorInfo.Get()))
 			{
-				ASC->TryActivateAbility(FoundSpec->Handle);
+				SpecForValidLink = SpecToTest;
 			}
 		}
 	}
-}
 
+	// This space reserved for post-combo nodes.
+
+
+	// If we have a link, try to activate.
+	// The ability itself may not want us to do so.
+	if (SpecForValidLink)
+	{
+		ASC->TryActivateAbility(SpecForValidLink->Handle);
+	}
+}
